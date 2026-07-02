@@ -18,8 +18,24 @@ android {
         versionName = "1.0"
     }
 
+    // どの環境でビルドしても同じ署名になるよう、リポジトリ同梱の
+    // デバッグ用キーストアを使う（毎回署名が変わると上書き更新できないため）。
+    // ※ゲーム用のダミー鍵。ストア配布時は必ず別の鍵を用意すること。
+    signingConfigs {
+        create("shared") {
+            storeFile = file("debug.keystore")
+            storePassword = "android"
+            keyAlias = "androiddebugkey"
+            keyPassword = "android"
+        }
+    }
+
     buildTypes {
+        debug {
+            signingConfig = signingConfigs.getByName("shared")
+        }
         release {
+            signingConfig = signingConfigs.getByName("shared")
             isMinifyEnabled = false
             proguardFiles(
                 getDefaultProguardFile("proguard-android-optimize.txt"),

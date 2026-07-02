@@ -50,6 +50,8 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.window.Dialog
+import androidx.compose.ui.window.DialogProperties
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.compose.LocalLifecycleOwner
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
@@ -134,14 +136,14 @@ fun StockDetailScreen(
             ) {
                 OutlinedButton(
                     onClick = { tradeSide = TradeSide.SELL },
-                    enabled = (state.holding?.quantity ?: 0L) > 0 && state.quote != null,
+                    enabled = (state.holding?.quantity ?: 0L) > 0 && state.quote != null && !state.isTrading,
                     modifier = Modifier.weight(1f),
                 ) {
                     Text("売る", color = DownGreen)
                 }
                 Button(
                     onClick = { tradeSide = TradeSide.BUY },
-                    enabled = state.quote != null,
+                    enabled = state.quote != null && !state.isTrading,
                     modifier = Modifier.weight(1f),
                     colors = ButtonDefaults.buttonColors(containerColor = UpRed),
                 ) {
@@ -349,6 +351,41 @@ fun StockDetailScreen(
             },
             onDismiss = { tradeSide = null },
         )
+    }
+
+    // 約定待ちオーバーレイ（表示中は操作をブロック。閉じた瞬間の最新価格で約定する）
+    if (state.isTrading) {
+        Dialog(
+            onDismissRequest = {},
+            properties = DialogProperties(
+                dismissOnBackPress = false,
+                dismissOnClickOutside = false,
+            ),
+        ) {
+            Card(
+                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
+            ) {
+                Column(
+                    modifier = Modifier.padding(horizontal = 32.dp, vertical = 28.dp),
+                    horizontalAlignment = Alignment.CenterHorizontally,
+                ) {
+                    CircularProgressIndicator()
+                    Spacer(Modifier.height(16.dp))
+                    Text("取引中…", style = MaterialTheme.typography.titleMedium)
+                    Spacer(Modifier.height(4.dp))
+                    Text(
+                        text = "市場で約定を待っています",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = TextSecondary,
+                    )
+                    Text(
+                        text = "画面を閉じると注文はキャンセルされます",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = TextSecondary,
+                    )
+                }
+            }
+        }
     }
 }
 

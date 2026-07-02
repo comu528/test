@@ -65,6 +65,11 @@ class StockDetailViewModel(
         loadChart(_uiState.value.selectedRange)
     }
 
+    /** 自動更新用。チャートは触らず現在値だけ更新する（クロスヘア操作を邪魔しない） */
+    fun refreshQuote() {
+        loadQuote()
+    }
+
     fun selectRange(range: ChartRange) {
         if (range == _uiState.value.selectedRange) return
         _uiState.update { it.copy(selectedRange = range) }

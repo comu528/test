@@ -17,6 +17,7 @@ import kotlinx.coroutines.async
 import kotlinx.coroutines.awaitAll
 import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.flow.Flow
+import java.io.IOException
 import kotlin.math.floor
 
 class PortfolioRepository(
@@ -59,10 +60,7 @@ class PortfolioRepository(
 
     /** 総資産が尽きた時に呼ぶ。 */
     suspend fun markGameOver() {
-        val current = db.portfolioDao().get() ?: return
-        if (!current.gameOver) {
-            db.portfolioDao().upsert(current.copy(gameOver = true))
-        }
+        db.portfolioDao().setGameOver()
     }
 
     // ---- 売買 ----
@@ -191,20 +189,35 @@ class PortfolioRepository(
             )
         }
 
-    private fun ChartResult.toQuote(fallbackName: String?): Quote = Quote(
-        symbol = meta.symbol.orEmpty(),
-        name = meta.longName ?: meta.shortName ?: fallbackName ?: meta.symbol.orEmpty(),
-        currency = meta.currency ?: "JPY",
-        price = meta.regularMarketPrice ?: 0.0,
-        previousClose = meta.previousClose ?: meta.chartPreviousClose,
-        dayHigh = meta.regularMarketDayHigh,
-        dayLow = meta.regularMarketDayLow,
-        volume = meta.regularMarketVolume,
-        marketTime = meta.regularMarketTime,
-    )
+    private fun ChartResult.toQuote(fallbackName: String?): Quote {
+        // 現在値が欠けたレスポンスを0円として扱うと誤ったゲームオーバー判定や
+        // 損益計算につながるため、取得失敗として弾く
+        val price = meta.regularMarketPrice
+        if (price == null || price <= 0.0) {
+            throw IOException("現在値を取得できませんでした")
+        }
+        return Quote(
+            symbol = meta.symbol.orEmpty(),
+            name = meta.longName ?: meta.shortName ?: fallbackName ?: meta.symbol.orEmpty(),
+            currency = meta.currency ?: "JPY",
+            price = price,
+            previousClose = meta.previousClose ?: meta.chartPreviousClose,
+            dayHigh = meta.regularMarketDayHigh,
+            dayLow = meta.regularMarketDayLow,
+            volume = meta.regularMarketVolume,
+            marketTime = meta.regularMarketTime,
+        )
+    }
 
     companion object {
         /** 約定代金に対する手数料率 */
         const val FEE_RATE = 0.001
+
+        /**
+         * ゲームオーバー閾値。現物取引のみでは総資産が厳密に0円を下回ることは
+         * ないため、「これ以上まともな取引ができない＝資金が底をついた」ラインとして
+         * 総資産がこの額を下回ったら終了とする。
+         */
+        const val GAME_OVER_THRESHOLD = 1_000.0
     }
 }

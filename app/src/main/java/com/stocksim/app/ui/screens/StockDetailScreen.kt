@@ -50,7 +50,10 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.compose.LocalLifecycleOwner
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import androidx.lifecycle.repeatOnLifecycle
 import com.stocksim.app.data.PortfolioRepository
 import com.stocksim.app.model.ChartRange
 import com.stocksim.app.ui.components.PriceChangeText
@@ -66,6 +69,7 @@ import com.stocksim.app.util.formatSignedPercent
 import com.stocksim.app.util.formatSignedYen
 import com.stocksim.app.util.formatVolume
 import com.stocksim.app.util.formatYen
+import kotlinx.coroutines.delay
 import kotlin.math.floor
 
 private enum class TradeSide { BUY, SELL }
@@ -80,6 +84,17 @@ fun StockDetailScreen(
     val message by viewModel.message.collectAsStateWithLifecycle()
     val snackbarHostState = remember { SnackbarHostState() }
     var tradeSide by remember { mutableStateOf<TradeSide?>(null) }
+    val lifecycleOwner = LocalLifecycleOwner.current
+
+    // 表示中は60秒ごとに現在値を更新し、古い株価のまま約定できないようにする
+    LaunchedEffect(Unit) {
+        lifecycleOwner.repeatOnLifecycle(Lifecycle.State.RESUMED) {
+            while (true) {
+                delay(60_000)
+                viewModel.refreshQuote()
+            }
+        }
+    }
 
     LaunchedEffect(message) {
         message?.let {
@@ -395,7 +410,11 @@ private fun TradeDialog(
                     )
                     Spacer(Modifier.width(8.dp))
                     Column {
-                        TextButton(onClick = { quantityText = (quantity + 100).toString() }) {
+                        TextButton(
+                            onClick = {
+                                quantityText = (quantity + 100).coerceAtMost(999_999_999L).toString()
+                            },
+                        ) {
                             Text("+100")
                         }
                         TextButton(

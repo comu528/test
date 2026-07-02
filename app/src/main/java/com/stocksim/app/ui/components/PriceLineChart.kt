@@ -184,7 +184,7 @@ fun PriceLineChart(
             val padX = 6.dp.toPx()
             val padY = 3.dp.toPx()
             val tipX = (x - tooltip.size.width / 2f)
-                .coerceIn(padX, w - tooltip.size.width - padX)
+                .coerceIn(padX, (w - tooltip.size.width - padX).coerceAtLeast(padX))
             drawRoundRect(
                 color = AppSurfaceVariant,
                 topLeft = Offset(tipX - padX, 0f),

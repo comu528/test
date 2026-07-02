@@ -42,7 +42,10 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.compose.LocalLifecycleOwner
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import androidx.lifecycle.repeatOnLifecycle
 import com.stocksim.app.model.HoldingView
 import com.stocksim.app.ui.theme.TextSecondary
 import com.stocksim.app.ui.theme.pnlColor
@@ -52,6 +55,7 @@ import com.stocksim.app.util.formatQuantity
 import com.stocksim.app.util.formatSignedPercent
 import com.stocksim.app.util.formatSignedYen
 import com.stocksim.app.util.formatYen
+import kotlinx.coroutines.delay
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -64,6 +68,18 @@ fun PortfolioScreen(
     val error by viewModel.error.collectAsStateWithLifecycle()
     val snackbarHostState = remember { SnackbarHostState() }
     var showResetDialog by remember { mutableStateOf(false) }
+    val lifecycleOwner = LocalLifecycleOwner.current
+
+    // 画面が表示されている間だけ60秒ごとに株価を自動更新する
+    // （Yahoo のデータ自体が15〜20分遅延なので十分な頻度）
+    LaunchedEffect(Unit) {
+        lifecycleOwner.repeatOnLifecycle(Lifecycle.State.RESUMED) {
+            while (true) {
+                viewModel.autoRefresh()
+                delay(60_000)
+            }
+        }
+    }
 
     LaunchedEffect(error) {
         error?.let {

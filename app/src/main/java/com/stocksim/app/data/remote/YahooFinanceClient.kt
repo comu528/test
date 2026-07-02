@@ -35,7 +35,7 @@ class YahooFinanceClient {
                 .addQueryParameter("includePrePost", "false")
                 .build()
             val body = get(url.toString())
-            val response = json.decodeFromString<ChartResponse>(body)
+            val response = json.decodeFromString(ChartResponse.serializer(), body)
             response.chart.error?.let {
                 throw IOException(it.description ?: it.code ?: "チャートの取得に失敗しました")
             }
@@ -52,7 +52,7 @@ class YahooFinanceClient {
             .addQueryParameter("listsCount", "0")
             .build()
         val body = get(url.toString())
-        json.decodeFromString<SearchResponse>(body).quotes
+        json.decodeFromString(SearchResponse.serializer(), body).quotes
     }
 
     private fun get(url: String): String {

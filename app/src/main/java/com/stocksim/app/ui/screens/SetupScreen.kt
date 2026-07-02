@@ -104,6 +104,7 @@ fun SetupScreen(onStart: (Double) -> Unit) {
             value = customText,
             onValueChange = { input -> customText = input.filter { it.isDigit() }.take(12) },
             label = { Text("カスタム金額（円）") },
+            supportingText = { Text("10,000円以上") },
             singleLine = true,
             keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
             modifier = Modifier.fillMaxWidth(),
@@ -112,7 +113,7 @@ fun SetupScreen(onStart: (Double) -> Unit) {
         Spacer(Modifier.height(24.dp))
         Button(
             onClick = { onStart(amount.toDouble()) },
-            enabled = amount > 0,
+            enabled = amount >= 10_000,
             modifier = Modifier.fillMaxWidth(),
         ) {
             Text("${formatYen(amount.toDouble())} で始める")

@@ -13,8 +13,6 @@ import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.flow.update
-import kotlinx.coroutines.delay
-import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
 
 data class PortfolioUiState(
@@ -62,50 +60,60 @@ class PortfolioViewModel(private val repo: PortfolioRepository) : ViewModel() {
         )
     }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), PortfolioUiState())
 
-    init {
-        // 60秒ごとに自動更新（Yahoo のデータ自体が15〜20分遅延なので十分な頻度）
-        viewModelScope.launch {
-            while (isActive) {
-                refreshInternal()
-                delay(60_000)
-            }
-        }
+    /** 画面側のライフサイクル対応ループから呼ばれる自動更新（エラーは静かに握りつぶす） */
+    fun autoRefresh() {
+        viewModelScope.launch { refreshInternal(manual = false) }
     }
 
+    /** 更新ボタンからの手動更新（失敗はスナックバーで通知する） */
     fun refresh() {
-        viewModelScope.launch { refreshInternal() }
+        viewModelScope.launch { refreshInternal(manual = true) }
     }
 
     fun consumeError() {
         _error.value = null
     }
 
-    private suspend fun refreshInternal() {
-        val symbols = repo.holdings.first().map { it.symbol }
-        if (symbols.isEmpty()) {
-            lastUpdated.value = System.currentTimeMillis()
-            return
-        }
+    private suspend fun refreshInternal(manual: Boolean) {
+        if (refreshing.value) return // 自動更新と手動更新の重複実行を防ぐ
         refreshing.value = true
-        val fetched = repo.fetchQuotes(symbols)
-        refreshing.value = false
-        if (fetched.isEmpty()) {
-            _error.value = "株価を取得できませんでした。通信環境を確認してください。"
-            return
+        try {
+            val symbols = repo.holdings.first().map { it.symbol }
+            if (symbols.isNotEmpty()) {
+                val fetched = repo.fetchQuotes(symbols)
+                if (fetched.isEmpty()) {
+                    if (manual) {
+                        _error.value = "株価を取得できませんでした。通信環境を確認してください。"
+                    }
+                    return
+                }
+                quotes.update { it + fetched }
+                if (manual && fetched.size < symbols.size) {
+                    _error.value = "一部の銘柄の株価を取得できませんでした"
+                }
+            }
+            lastUpdated.value = System.currentTimeMillis()
+        } finally {
+            refreshing.value = false
         }
-        quotes.update { it + fetched }
-        lastUpdated.value = System.currentTimeMillis()
         checkGameOver()
     }
 
-    /** 全保有銘柄の現在値が揃っている時だけ総資産を判定する */
+    /**
+     * 総資産がゲームオーバー閾値を下回っていないか判定する。
+     * 現在値を取得できていない銘柄は表示と同じく平均取得単価で評価する。
+     */
     private suspend fun checkGameOver() {
         val portfolio = repo.portfolio.first() ?: return
+        if (portfolio.gameOver) return
         val holdings = repo.holdings.first()
         val quoteMap = quotes.value
-        if (holdings.any { quoteMap[it.symbol] == null }) return
-        val total = portfolio.cash + holdings.sumOf { (quoteMap[it.symbol]?.price ?: 0.0) * it.quantity }
-        if (total <= 0.0) {
+        val marketValue = holdings.sumOf { holding ->
+            val price = quoteMap[holding.symbol]?.price?.takeIf { it > 0.0 }
+                ?: holding.averageCost
+            price * holding.quantity
+        }
+        if (portfolio.cash + marketValue < PortfolioRepository.GAME_OVER_THRESHOLD) {
             repo.markGameOver()
         }
     }

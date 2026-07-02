@@ -17,6 +17,10 @@ interface PortfolioDao {
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun upsert(portfolio: PortfolioEntity)
 
+    /** 他カラムを触らずゲームオーバーだけ立てる（売買トランザクションと競合しても安全） */
+    @Query("UPDATE portfolio SET gameOver = 1 WHERE id = 1")
+    suspend fun setGameOver()
+
     @Query("DELETE FROM portfolio")
     suspend fun clear()
 }

@@ -22,6 +22,7 @@ data class PortfolioUiState(
     val holdings: List<HoldingView> = emptyList(),
     val isRefreshing: Boolean = false,
     val lastUpdated: Long? = null,
+    val enforceTradingHours: Boolean = true,
 ) {
     val marketValue: Double get() = holdings.sumOf { it.marketValue }
     val totalAssets: Double get() = cash + marketValue
@@ -45,6 +46,7 @@ class PortfolioViewModel(private val repo: PortfolioRepository) : ViewModel() {
         PortfolioUiState(
             initialCapital = portfolio?.initialCapital ?: 0.0,
             cash = portfolio?.cash ?: 0.0,
+            enforceTradingHours = portfolio?.enforceTradingHours ?: true,
             holdings = holdings.map { h ->
                 val quote = quoteMap[h.symbol]
                 HoldingView(
@@ -78,6 +80,10 @@ class PortfolioViewModel(private val repo: PortfolioRepository) : ViewModel() {
 
     fun consumeError() {
         _error.value = null
+    }
+
+    fun setEnforceTradingHours(enabled: Boolean) {
+        viewModelScope.launch { repo.setEnforceTradingHours(enabled) }
     }
 
     private suspend fun refreshInternal(manual: Boolean) {

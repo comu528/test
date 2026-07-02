@@ -15,7 +15,7 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 
-enum class Market(val label: String) { JAPAN("日本株"), US("米国株") }
+enum class Market(val label: String) { JAPAN("日本株"), US("米国株"), FX("FX") }
 
 enum class MarketSort(val label: String) { GAINERS("値上がり"), LOSERS("値下がり"), CODE("コード順") }
 
@@ -150,6 +150,7 @@ class SearchViewModel(private val repo: PortfolioRepository) : ViewModel() {
     private fun catalogFor(market: Market) = when (market) {
         Market.JAPAN -> MarketCatalog.japan
         Market.US -> MarketCatalog.us
+        Market.FX -> MarketCatalog.fx
     }
 
     companion object {

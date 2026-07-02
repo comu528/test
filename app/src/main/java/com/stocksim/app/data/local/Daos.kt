@@ -21,6 +21,9 @@ interface PortfolioDao {
     @Query("UPDATE portfolio SET gameOver = 1 WHERE id = 1")
     suspend fun setGameOver()
 
+    @Query("UPDATE portfolio SET enforceTradingHours = :enabled WHERE id = 1")
+    suspend fun setEnforceTradingHours(enabled: Boolean)
+
     @Query("DELETE FROM portfolio")
     suspend fun clear()
 }

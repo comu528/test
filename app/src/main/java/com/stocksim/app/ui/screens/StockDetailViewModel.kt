@@ -8,6 +8,7 @@ import com.stocksim.app.model.ChartRange
 import com.stocksim.app.model.ChartSeries
 import com.stocksim.app.model.Quote
 import com.stocksim.app.model.TradeOutcome
+import com.stocksim.app.util.TradingHours
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
@@ -31,7 +32,15 @@ data class StockDetailUiState(
     val cash: Double = 0.0,
     /** 注文執行中（「取引中…」オーバーレイ表示） */
     val isTrading: Boolean = false,
-)
+    /** 取引可能時間内か（遅延ずらし済み。制限OFF時は常に売買可） */
+    val marketOpen: Boolean = true,
+    /** 取引可能時間帯の表示用文字列 */
+    val marketHoursLabel: String? = null,
+    /** 取引可能時間の制限設定 */
+    val enforceTradingHours: Boolean = true,
+) {
+    val canTradeNow: Boolean get() = !enforceTradingHours || marketOpen
+}
 
 class StockDetailViewModel(
     private val repo: PortfolioRepository,
@@ -58,7 +67,12 @@ class StockDetailViewModel(
         }
         viewModelScope.launch {
             repo.portfolio.collect { portfolio ->
-                _uiState.update { it.copy(cash = portfolio?.cash ?: 0.0) }
+                _uiState.update {
+                    it.copy(
+                        cash = portfolio?.cash ?: 0.0,
+                        enforceTradingHours = portfolio?.enforceTradingHours ?: true,
+                    )
+                }
             }
         }
         refresh()
@@ -99,6 +113,10 @@ class StockDetailViewModel(
             _message.value = "株価を取得できていないため注文できません"
             return
         }
+        if (!state.canTradeNow) {
+            _message.value = "取引時間外です（取引可能: ${state.marketHoursLabel ?: "-"}）"
+            return
+        }
         viewModelScope.launch {
             _uiState.update { it.copy(isTrading = true) }
             try {
@@ -109,7 +127,14 @@ class StockDetailViewModel(
                     _message.value = "株価を取得できず注文が失敗しました"
                     return@launch
                 }
-                _uiState.update { it.copy(quote = quote, name = quote.name) }
+                updateQuote(quote)
+                // ラグの間に市場が閉まった場合は約定させない
+                if (_uiState.value.enforceTradingHours &&
+                    !TradingHours.isOpen(symbol, quote.delayMinutes)
+                ) {
+                    _message.value = "取引時間が終了したため注文は失敗しました"
+                    return@launch
+                }
                 val outcome = if (isBuy) {
                     repo.buy(symbol, quote.name, quote.currency, quantity, quote.priceJpy)
                 } else {
@@ -125,14 +150,25 @@ class StockDetailViewModel(
         }
     }
 
+    /** クオートと取引可能時間の状態をまとめて反映する */
+    private fun updateQuote(quote: Quote) {
+        _uiState.update {
+            it.copy(
+                quote = quote,
+                name = quote.name,
+                marketOpen = TradingHours.isOpen(symbol, quote.delayMinutes),
+                marketHoursLabel = TradingHours.hoursLabel(symbol, quote.delayMinutes),
+            )
+        }
+    }
+
     private fun loadQuote() {
         viewModelScope.launch {
             _uiState.update { it.copy(isLoadingQuote = true, error = null) }
             try {
                 val quote = repo.fetchQuote(symbol, fallbackName = _uiState.value.name)
-                _uiState.update {
-                    it.copy(quote = quote, name = quote.name, isLoadingQuote = false)
-                }
+                updateQuote(quote)
+                _uiState.update { it.copy(isLoadingQuote = false) }
             } catch (e: CancellationException) {
                 throw e
             } catch (e: Exception) {

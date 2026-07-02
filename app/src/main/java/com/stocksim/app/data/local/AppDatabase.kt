@@ -14,7 +14,7 @@ import androidx.sqlite.db.SupportSQLiteDatabase
         TradeEntity::class,
         AssetSnapshotEntity::class,
     ],
-    version = 2,
+    version = 3,
     exportSchema = false,
 )
 abstract class AppDatabase : RoomDatabase() {
@@ -40,9 +40,18 @@ abstract class AppDatabase : RoomDatabase() {
             }
         }
 
+        /** v3: 取引可能時間制限のON/OFF設定 */
+        private val MIGRATION_2_3 = object : Migration(2, 3) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                db.execSQL(
+                    "ALTER TABLE portfolio ADD COLUMN enforceTradingHours INTEGER NOT NULL DEFAULT 1"
+                )
+            }
+        }
+
         fun build(context: Context): AppDatabase =
             Room.databaseBuilder(context, AppDatabase::class.java, "stocksim.db")
-                .addMigrations(MIGRATION_1_2)
+                .addMigrations(MIGRATION_1_2, MIGRATION_2_3)
                 .build()
     }
 }

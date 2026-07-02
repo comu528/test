@@ -15,6 +15,7 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material.icons.outlined.RestartAlt
+import androidx.compose.material.icons.outlined.Settings
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
@@ -27,6 +28,7 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.SnackbarHostState
+import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
@@ -58,6 +60,7 @@ import com.stocksim.app.util.formatQuantity
 import com.stocksim.app.util.formatSignedPercent
 import com.stocksim.app.util.formatSignedYen
 import com.stocksim.app.util.formatYen
+import com.stocksim.app.util.unitLabelFor
 import kotlinx.coroutines.delay
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -72,6 +75,7 @@ fun PortfolioScreen(
     val error by viewModel.error.collectAsStateWithLifecycle()
     val snackbarHostState = remember { SnackbarHostState() }
     var showResetDialog by remember { mutableStateOf(false) }
+    var showSettingsDialog by remember { mutableStateOf(false) }
     val lifecycleOwner = LocalLifecycleOwner.current
 
     // 画面が表示されている間だけ60秒ごとに株価を自動更新する
@@ -102,6 +106,9 @@ fun PortfolioScreen(
                 actions = {
                     IconButton(onClick = { viewModel.refresh() }) {
                         Icon(Icons.Filled.Refresh, contentDescription = "株価を更新")
+                    }
+                    IconButton(onClick = { showSettingsDialog = true }) {
+                        Icon(Icons.Outlined.Settings, contentDescription = "設定")
                     }
                     IconButton(onClick = { showResetDialog = true }) {
                         Icon(Icons.Outlined.RestartAlt, contentDescription = "最初からやり直す")
@@ -177,6 +184,34 @@ fun PortfolioScreen(
                 }
             }
         }
+    }
+
+    if (showSettingsDialog) {
+        AlertDialog(
+            onDismissRequest = { showSettingsDialog = false },
+            title = { Text("設定") },
+            text = {
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Column(modifier = Modifier.weight(1f)) {
+                        Text("取引時間の制限", style = MaterialTheme.typography.bodyLarge)
+                        Spacer(Modifier.height(2.dp))
+                        Text(
+                            text = "実際の市場の取引時間（データ遅延分だけ後ろにずらした時間帯）内のみ売買できるようにします。OFFにするといつでも売買できます。",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = TextSecondary,
+                        )
+                    }
+                    Spacer(Modifier.width(12.dp))
+                    Switch(
+                        checked = state.enforceTradingHours,
+                        onCheckedChange = { viewModel.setEnforceTradingHours(it) },
+                    )
+                }
+            },
+            confirmButton = {
+                TextButton(onClick = { showSettingsDialog = false }) { Text("閉じる") }
+            },
+        )
     }
 
     if (showResetDialog) {
@@ -289,7 +324,7 @@ private fun HoldingRow(holding: HoldingView, onClick: () -> Unit) {
                 )
                 Spacer(Modifier.height(2.dp))
                 Text(
-                    text = "${holding.symbol}・${formatQuantity(holding.quantity)}・平均 ${formatPrice(holding.averageCost)}円",
+                    text = "${holding.symbol}・${formatQuantity(holding.quantity, unitLabelFor(holding.symbol))}・平均 ${formatPrice(holding.averageCost)}円",
                     style = MaterialTheme.typography.bodySmall,
                     color = TextSecondary,
                 )

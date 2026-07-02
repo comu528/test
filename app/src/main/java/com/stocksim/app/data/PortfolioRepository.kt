@@ -13,7 +13,9 @@ import com.stocksim.app.model.ChartSeries
 import com.stocksim.app.model.Quote
 import com.stocksim.app.model.StockSearchResult
 import com.stocksim.app.model.TradeOutcome
+import com.stocksim.app.util.TradingHours
 import com.stocksim.app.util.formatYen
+import com.stocksim.app.util.unitLabelFor
 import kotlinx.coroutines.async
 import kotlinx.coroutines.awaitAll
 import kotlinx.coroutines.coroutineScope
@@ -94,6 +96,11 @@ class PortfolioRepository(
         db.portfolioDao().setGameOver()
     }
 
+    /** 取引可能時間の制限のON/OFF。 */
+    suspend fun setEnforceTradingHours(enabled: Boolean) {
+        db.portfolioDao().setEnforceTradingHours(enabled)
+    }
+
     // ---- 売買 ----
 
     /** 約定代金に対する手数料（0.1%、円未満切り捨て） */
@@ -149,7 +156,7 @@ class PortfolioRepository(
                     timestamp = System.currentTimeMillis(),
                 )
             )
-            TradeOutcome.Success("${name} を ${quantity}株 買付しました")
+            TradeOutcome.Success("${name} を ${quantity}${unitLabelFor(symbol)} 買付しました")
         }
     }
 
@@ -164,7 +171,7 @@ class PortfolioRepository(
                 ?: return@withTransaction TradeOutcome.Failure("この銘柄を保有していません")
             if (quantity > existing.quantity) {
                 return@withTransaction TradeOutcome.Failure(
-                    "保有数を超えています（保有 ${existing.quantity}株）"
+                    "保有数を超えています（保有 ${existing.quantity}${unitLabelFor(symbol)}）"
                 )
             }
             val proceeds = priceJpy * quantity
@@ -189,7 +196,7 @@ class PortfolioRepository(
                     timestamp = System.currentTimeMillis(),
                 )
             )
-            TradeOutcome.Success("${name} を ${quantity}株 売却しました")
+            TradeOutcome.Success("${name} を ${quantity}${unitLabelFor(symbol)} 売却しました")
         }
     }
 
@@ -247,20 +254,27 @@ class PortfolioRepository(
     }
 
     /**
-     * 銘柄検索。東証（.T）と米国市場（サフィックスなし）の株式・ETFを返す。
-     * それ以外の取引所は通貨換算が未対応のため除外する。
+     * 銘柄検索。東証（.T）・米国市場（サフィックスなし）の株式/ETFと、
+     * 円建てまたはドル建てのFXペア（=X）を返す。
+     * それ以外は通貨換算が未対応のため除外する。
      */
     suspend fun search(query: String): List<StockSearchResult> =
         yahoo.search(query).mapNotNull { quote ->
             val symbol = quote.symbol ?: return@mapNotNull null
-            if (quote.quoteType != "EQUITY" && quote.quoteType != "ETF") return@mapNotNull null
-            val isTokyo = symbol.endsWith(".T")
-            val isUs = !symbol.contains(".")
-            if (!isTokyo && !isUs) return@mapNotNull null
+            val isFx = quote.quoteType == "CURRENCY" &&
+                (symbol.endsWith("JPY=X") || symbol.endsWith("USD=X"))
+            val isEquity = quote.quoteType == "EQUITY" || quote.quoteType == "ETF"
+            val isTokyo = isEquity && symbol.endsWith(".T")
+            val isUs = isEquity && !symbol.contains(".")
+            if (!isFx && !isTokyo && !isUs) return@mapNotNull null
             StockSearchResult(
                 symbol = symbol,
                 name = quote.longname ?: quote.shortname ?: symbol,
-                exchange = quote.exchDisp ?: if (isTokyo) "東証" else "米国",
+                exchange = when {
+                    isFx -> "FX"
+                    isTokyo -> quote.exchDisp ?: "東証"
+                    else -> quote.exchDisp ?: "米国"
+                },
             )
         }
 
@@ -271,8 +285,9 @@ class PortfolioRepository(
         if (price == null || price <= 0.0) {
             throw IOException("現在値を取得できませんでした")
         }
+        val symbol = meta.symbol.orEmpty()
         return Quote(
-            symbol = meta.symbol.orEmpty(),
+            symbol = symbol,
             name = meta.longName ?: meta.shortName ?: fallbackName ?: meta.symbol.orEmpty(),
             currency = meta.currency ?: "JPY",
             price = price,
@@ -281,6 +296,7 @@ class PortfolioRepository(
             dayLow = meta.regularMarketDayLow,
             volume = meta.regularMarketVolume,
             marketTime = meta.regularMarketTime,
+            delayMinutes = meta.exchangeDataDelayedBy ?: TradingHours.defaultDelayFor(symbol),
         )
     }
 

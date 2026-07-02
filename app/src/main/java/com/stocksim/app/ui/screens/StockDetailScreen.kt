@@ -48,6 +48,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.window.Dialog
@@ -71,6 +72,7 @@ import com.stocksim.app.util.formatSignedPercent
 import com.stocksim.app.util.formatSignedYen
 import com.stocksim.app.util.formatVolume
 import com.stocksim.app.util.formatYen
+import com.stocksim.app.util.unitLabelFor
 import kotlinx.coroutines.delay
 import kotlin.math.floor
 
@@ -127,27 +129,44 @@ fun StockDetailScreen(
             )
         },
         bottomBar = {
-            Row(
+            Column(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .navigationBarsPadding()
-                    .padding(16.dp),
-                horizontalArrangement = Arrangement.spacedBy(12.dp),
+                    .navigationBarsPadding(),
             ) {
-                OutlinedButton(
-                    onClick = { tradeSide = TradeSide.SELL },
-                    enabled = (state.holding?.quantity ?: 0L) > 0 && state.quote != null && !state.isTrading,
-                    modifier = Modifier.weight(1f),
-                ) {
-                    Text("売る", color = DownGreen)
+                if (state.enforceTradingHours && !state.marketOpen && state.quote != null) {
+                    Text(
+                        text = "取引時間外です（取引可能: ${state.marketHoursLabel ?: "-"}）",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = TextSecondary,
+                        textAlign = TextAlign.Center,
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(horizontal = 16.dp, vertical = 4.dp),
+                    )
                 }
-                Button(
-                    onClick = { tradeSide = TradeSide.BUY },
-                    enabled = state.quote != null && !state.isTrading,
-                    modifier = Modifier.weight(1f),
-                    colors = ButtonDefaults.buttonColors(containerColor = UpRed),
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(16.dp),
+                    horizontalArrangement = Arrangement.spacedBy(12.dp),
                 ) {
-                    Text("買う")
+                    OutlinedButton(
+                        onClick = { tradeSide = TradeSide.SELL },
+                        enabled = (state.holding?.quantity ?: 0L) > 0 && state.quote != null &&
+                            !state.isTrading && state.canTradeNow,
+                        modifier = Modifier.weight(1f),
+                    ) {
+                        Text("売る", color = DownGreen)
+                    }
+                    Button(
+                        onClick = { tradeSide = TradeSide.BUY },
+                        enabled = state.quote != null && !state.isTrading && state.canTradeNow,
+                        modifier = Modifier.weight(1f),
+                        colors = ButtonDefaults.buttonColors(containerColor = UpRed),
+                    ) {
+                        Text("買う")
+                    }
                 }
             }
         },
@@ -205,7 +224,11 @@ fun StockDetailScreen(
                     Text(
                         text = buildString {
                             if (isForeign) append("約 ${formatYen(quote.priceJpy)}・")
-                            append("15〜20分遅延データ")
+                            if (quote.delayMinutes > 0) {
+                                append("${quote.delayMinutes}分遅延データ")
+                            } else {
+                                append("ほぼリアルタイム")
+                            }
                             quote.marketTime?.let { append("・${formatFullDateTime(it * 1000)} 時点") }
                         },
                         style = MaterialTheme.typography.bodySmall,
@@ -301,7 +324,7 @@ fun StockDetailScreen(
                     Column(modifier = Modifier.padding(16.dp)) {
                         Text("保有状況", style = MaterialTheme.typography.titleSmall)
                         Spacer(Modifier.height(8.dp))
-                        StatRow("保有数量", formatQuantity(holding.quantity))
+                        StatRow("保有数量", formatQuantity(holding.quantity, unitLabelFor(state.symbol)))
                         StatRow("平均取得単価", "${formatPrice(holding.averageCost)}円")
                         StatRow(
                             label = "評価損益",
@@ -340,6 +363,7 @@ fun StockDetailScreen(
         TradeDialog(
             isBuy = side == TradeSide.BUY,
             name = state.name,
+            symbol = state.symbol,
             price = quote.price,
             priceJpy = quote.priceJpy,
             currency = quote.currency,
@@ -416,6 +440,7 @@ private fun StatRow(
 private fun TradeDialog(
     isBuy: Boolean,
     name: String,
+    symbol: String,
     price: Double,
     priceJpy: Double,
     currency: String,
@@ -424,7 +449,10 @@ private fun TradeDialog(
     onConfirm: (quantity: Long) -> Unit,
     onDismiss: () -> Unit,
 ) {
-    var quantityText by remember { mutableStateOf("100") }
+    val isFx = symbol.endsWith("=X")
+    val unit = unitLabelFor(symbol)
+    val step = if (isFx) 1_000L else 100L
+    var quantityText by remember { mutableStateOf(if (isFx) "1000" else "100") }
     val quantity = quantityText.toLongOrNull() ?: 0L
     val isForeign = currency != "JPY"
 
@@ -436,7 +464,7 @@ private fun TradeDialog(
     val validationError = when {
         quantity <= 0 -> "数量を入力してください"
         isBuy && total > cash -> "買付余力が不足しています"
-        !isBuy && quantity > heldQuantity -> "保有数（${formatQuantity(heldQuantity)}）を超えています"
+        !isBuy && quantity > heldQuantity -> "保有数（${formatQuantity(heldQuantity, unit)}）を超えています"
         else -> null
     }
 
@@ -465,7 +493,7 @@ private fun TradeDialog(
                         onValueChange = { input ->
                             quantityText = input.filter { it.isDigit() }.take(9)
                         },
-                        label = { Text("数量（株）") },
+                        label = { Text("数量（$unit）") },
                         singleLine = true,
                         keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
                         modifier = Modifier.weight(1f),
@@ -474,15 +502,15 @@ private fun TradeDialog(
                     Column {
                         TextButton(
                             onClick = {
-                                quantityText = (quantity + 100).coerceAtMost(999_999_999L).toString()
+                                quantityText = (quantity + step).coerceAtMost(999_999_999L).toString()
                             },
                         ) {
-                            Text("+100")
+                            Text("+$step")
                         }
                         TextButton(
-                            onClick = { quantityText = maxOf(quantity - 100, 1L).toString() },
+                            onClick = { quantityText = maxOf(quantity - step, 1L).toString() },
                         ) {
-                            Text("-100")
+                            Text("-$step")
                         }
                     }
                 }
@@ -524,7 +552,7 @@ private fun TradeDialog(
                         color = TextSecondary,
                     )
                     Text(
-                        text = if (isBuy) formatYen(cash - total) else formatQuantity(heldQuantity),
+                        text = if (isBuy) formatYen(cash - total) else formatQuantity(heldQuantity, unit),
                         style = MaterialTheme.typography.bodySmall,
                         color = TextSecondary,
                     )

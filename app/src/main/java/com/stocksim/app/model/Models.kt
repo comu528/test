@@ -14,6 +14,8 @@ data class Quote(
     val dayLow: Double?,
     val volume: Long?,
     val marketTime: Long?,
+    /** データの遅延（分）。取引可能時間の判定にも使う */
+    val delayMinutes: Int = 0,
 ) {
     val change: Double? get() = previousClose?.let { price - it }
     val changePercent: Double?

@@ -9,6 +9,7 @@ import kotlin.math.roundToLong
 
 private val yenFormat = DecimalFormat("#,##0")
 private val priceFormat = DecimalFormat("#,##0.##")
+private val smallPriceFormat = DecimalFormat("0.0000")
 private val percentFormat = DecimalFormat("0.00")
 
 /** 金額（円）。小数は四捨五入して表示する。 */
@@ -20,8 +21,12 @@ fun formatSignedYen(value: Double): String {
     return sign + "¥" + yenFormat.format(abs(value).roundToLong())
 }
 
-/** 株価。呼値が小数の銘柄（ETF等）に備え小数第2位まで表示する。 */
-fun formatPrice(value: Double): String = priceFormat.format(value)
+/** 株価・レート。10未満（EURUSD等のFXレートなど）は小数第4位まで表示する。 */
+fun formatPrice(value: Double): String =
+    if (abs(value) < 10.0) smallPriceFormat.format(value) else priceFormat.format(value)
+
+/** 数量の単位。FX（=X）は「通貨」、それ以外は「株」。 */
+fun unitLabelFor(symbol: String): String = if (symbol.endsWith("=X")) "通貨" else "株"
 
 /** 符号付きパーセント。 */
 fun formatSignedPercent(value: Double): String {
@@ -29,7 +34,7 @@ fun formatSignedPercent(value: Double): String {
     return sign + percentFormat.format(abs(value)) + "%"
 }
 
-fun formatQuantity(value: Long): String = yenFormat.format(value) + "株"
+fun formatQuantity(value: Long, unit: String = "株"): String = yenFormat.format(value) + unit
 
 fun formatVolume(value: Long): String = yenFormat.format(value)
 

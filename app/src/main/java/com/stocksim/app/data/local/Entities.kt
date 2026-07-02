@@ -11,6 +11,8 @@ data class PortfolioEntity(
     val cash: Double,
     val gameOver: Boolean = false,
     val createdAt: Long,
+    /** 取引可能時間の制限（実際の立会時間＋データ遅延分の時間帯のみ売買可） */
+    val enforceTradingHours: Boolean = true,
 )
 
 /** 保有銘柄 */

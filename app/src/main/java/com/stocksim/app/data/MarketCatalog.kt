@@ -56,6 +56,19 @@ object MarketCatalog {
         CatalogStock("9766.T", "コナミグループ"),
     )
 
+    val fx = listOf(
+        CatalogStock("USDJPY=X", "米ドル/円"),
+        CatalogStock("EURJPY=X", "ユーロ/円"),
+        CatalogStock("GBPJPY=X", "英ポンド/円"),
+        CatalogStock("AUDJPY=X", "豪ドル/円"),
+        CatalogStock("NZDJPY=X", "NZドル/円"),
+        CatalogStock("CADJPY=X", "カナダドル/円"),
+        CatalogStock("CHFJPY=X", "スイスフラン/円"),
+        CatalogStock("EURUSD=X", "ユーロ/米ドル"),
+        CatalogStock("GBPUSD=X", "英ポンド/米ドル"),
+        CatalogStock("AUDUSD=X", "豪ドル/米ドル"),
+    )
+
     val us = listOf(
         CatalogStock("AAPL", "アップル"),
         CatalogStock("MSFT", "マイクロソフト"),

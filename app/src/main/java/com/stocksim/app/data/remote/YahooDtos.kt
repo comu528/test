@@ -40,6 +40,8 @@ data class ChartMeta(
     val regularMarketDayLow: Double? = null,
     val regularMarketVolume: Long? = null,
     val regularMarketTime: Long? = null,
+    /** 取引所ごとのデータ遅延（分） */
+    val exchangeDataDelayedBy: Int? = null,
 )
 
 @Serializable

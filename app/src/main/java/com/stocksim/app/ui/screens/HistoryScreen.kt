@@ -45,6 +45,7 @@ import com.stocksim.app.util.formatPrice
 import com.stocksim.app.util.formatQuantity
 import com.stocksim.app.util.formatSignedYen
 import com.stocksim.app.util.formatYen
+import com.stocksim.app.util.unitLabelFor
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.stateIn
 
@@ -145,7 +146,7 @@ private fun TradeRow(trade: TradeEntity) {
             Spacer(Modifier.width(12.dp))
             Column(horizontalAlignment = Alignment.End) {
                 Text(
-                    text = "${formatQuantity(trade.quantity)} × ${formatPrice(trade.price)}円",
+                    text = "${formatQuantity(trade.quantity, unitLabelFor(trade.symbol))} × ${formatPrice(trade.price)}円",
                     style = MaterialTheme.typography.bodyMedium,
                 )
                 Spacer(Modifier.height(2.dp))

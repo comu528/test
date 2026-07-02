@@ -24,6 +24,10 @@ interface PortfolioDao {
     @Query("UPDATE portfolio SET enforceTradingHours = :enabled WHERE id = 1")
     suspend fun setEnforceTradingHours(enabled: Boolean)
 
+    /** 最高レベルを更新（現在値より高い時だけ） */
+    @Query("UPDATE portfolio SET maxLevel = :level WHERE id = 1 AND maxLevel < :level")
+    suspend fun raiseMaxLevel(level: Int)
+
     @Query("DELETE FROM portfolio")
     suspend fun clear()
 }

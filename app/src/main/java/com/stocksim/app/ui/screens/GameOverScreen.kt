@@ -51,7 +51,7 @@ fun GameOverScreen(
         )
         Spacer(Modifier.height(12.dp))
         Text(
-            text = "総資産が1,000円を下回りました…。\n初期資金 ${formatYen(initialCapital)} は市場に消えました。",
+            text = "総資産が1,000円を下回りました…。\n初期資金 ${formatYen(initialCapital)} は市場に消え、\nレベルもLv.1からやり直しです。",
             style = MaterialTheme.typography.bodyLarge,
             color = TextSecondary,
             textAlign = TextAlign.Center,

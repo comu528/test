@@ -14,7 +14,7 @@ import androidx.sqlite.db.SupportSQLiteDatabase
         TradeEntity::class,
         AssetSnapshotEntity::class,
     ],
-    version = 3,
+    version = 4,
     exportSchema = false,
 )
 abstract class AppDatabase : RoomDatabase() {
@@ -49,9 +49,18 @@ abstract class AppDatabase : RoomDatabase() {
             }
         }
 
+        /** v4: 資産倍率レベル（最高到達レベルの記録） */
+        private val MIGRATION_3_4 = object : Migration(3, 4) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                db.execSQL(
+                    "ALTER TABLE portfolio ADD COLUMN maxLevel INTEGER NOT NULL DEFAULT 1"
+                )
+            }
+        }
+
         fun build(context: Context): AppDatabase =
             Room.databaseBuilder(context, AppDatabase::class.java, "stocksim.db")
-                .addMigrations(MIGRATION_1_2, MIGRATION_2_3)
+                .addMigrations(MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4)
                 .build()
     }
 }

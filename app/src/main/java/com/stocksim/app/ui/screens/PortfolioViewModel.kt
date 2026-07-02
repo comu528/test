@@ -6,6 +6,7 @@ import com.stocksim.app.data.PortfolioRepository
 import com.stocksim.app.data.local.AssetSnapshotEntity
 import com.stocksim.app.model.HoldingView
 import com.stocksim.app.model.Quote
+import com.stocksim.app.util.Level
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
@@ -23,12 +24,18 @@ data class PortfolioUiState(
     val isRefreshing: Boolean = false,
     val lastUpdated: Long? = null,
     val enforceTradingHours: Boolean = true,
+    val maxLevel: Int = 1,
 ) {
     val marketValue: Double get() = holdings.sumOf { it.marketValue }
     val totalAssets: Double get() = cash + marketValue
     val totalPnl: Double get() = totalAssets - initialCapital
     val totalPnlPercent: Double?
         get() = initialCapital.takeIf { it != 0.0 }?.let { totalPnl / it * 100.0 }
+
+    // ---- 資産倍率レベル ----
+    val level: Int get() = Level.levelFor(totalAssets, initialCapital)
+    val levelProgress: Float get() = Level.progressToNext(totalAssets, initialCapital)
+    val assetsForNextLevel: Double get() = Level.assetsForNextLevel(level, initialCapital)
 }
 
 class PortfolioViewModel(private val repo: PortfolioRepository) : ViewModel() {
@@ -47,6 +54,7 @@ class PortfolioViewModel(private val repo: PortfolioRepository) : ViewModel() {
             initialCapital = portfolio?.initialCapital ?: 0.0,
             cash = portfolio?.cash ?: 0.0,
             enforceTradingHours = portfolio?.enforceTradingHours ?: true,
+            maxLevel = portfolio?.maxLevel ?: 1,
             holdings = holdings.map { h ->
                 val quote = quoteMap[h.symbol]
                 HoldingView(
@@ -126,6 +134,10 @@ class PortfolioViewModel(private val repo: PortfolioRepository) : ViewModel() {
         }
         val total = portfolio.cash + marketValue
         repo.recordSnapshot(total)
+        val level = Level.levelFor(total, portfolio.initialCapital)
+        if (level > portfolio.maxLevel) {
+            repo.raiseMaxLevel(level)
+        }
         if (!portfolio.gameOver && total < PortfolioRepository.GAME_OVER_THRESHOLD) {
             repo.markGameOver()
         }

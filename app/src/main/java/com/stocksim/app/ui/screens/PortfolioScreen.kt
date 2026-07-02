@@ -1,7 +1,9 @@
 package com.stocksim.app.ui.screens
 
+import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
@@ -12,6 +14,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material.icons.outlined.RestartAlt
@@ -24,6 +27,7 @@ import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
+import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.SnackbarHost
@@ -52,6 +56,7 @@ import com.stocksim.app.data.local.AssetSnapshotEntity
 import com.stocksim.app.model.ChartSeries
 import com.stocksim.app.model.HoldingView
 import com.stocksim.app.ui.components.PriceLineChart
+import com.stocksim.app.ui.theme.AppPrimary
 import com.stocksim.app.ui.theme.TextSecondary
 import com.stocksim.app.ui.theme.pnlColor
 import com.stocksim.app.util.formatDateTime
@@ -239,7 +244,37 @@ private fun SummaryCard(state: PortfolioUiState) {
         colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
     ) {
         Column(modifier = Modifier.padding(20.dp)) {
-            Text("総資産", style = MaterialTheme.typography.labelMedium, color = TextSecondary)
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                Text(
+                    text = "総資産",
+                    style = MaterialTheme.typography.labelMedium,
+                    color = TextSecondary,
+                    modifier = Modifier.weight(1f),
+                )
+                Box(
+                    modifier = Modifier
+                        .background(AppPrimary.copy(alpha = 0.15f), RoundedCornerShape(8.dp))
+                        .padding(horizontal = 10.dp, vertical = 4.dp),
+                ) {
+                    Text(
+                        text = "Lv.${state.level}",
+                        style = MaterialTheme.typography.labelLarge,
+                        fontWeight = FontWeight.Bold,
+                        color = AppPrimary,
+                    )
+                }
+                if (state.maxLevel > state.level) {
+                    Spacer(Modifier.width(8.dp))
+                    Text(
+                        text = "最高 Lv.${state.maxLevel}",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = TextSecondary,
+                    )
+                }
+            }
             Text(
                 text = formatYen(state.totalAssets),
                 style = MaterialTheme.typography.headlineLarge,
@@ -260,6 +295,28 @@ private fun SummaryCard(state: PortfolioUiState) {
                     color = pnlColor(state.totalPnl),
                 )
             }
+            Spacer(Modifier.height(12.dp))
+            // 次のレベルへの進捗
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+            ) {
+                Text(
+                    text = "次のLv.${state.level + 1}まで",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = TextSecondary,
+                )
+                Text(
+                    text = "あと ${formatYen((state.assetsForNextLevel - state.totalAssets).coerceAtLeast(0.0))}",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = TextSecondary,
+                )
+            }
+            Spacer(Modifier.height(4.dp))
+            LinearProgressIndicator(
+                progress = { state.levelProgress },
+                modifier = Modifier.fillMaxWidth(),
+            )
             Spacer(Modifier.height(16.dp))
             HorizontalDivider()
             Spacer(Modifier.height(12.dp))

@@ -13,6 +13,8 @@ data class PortfolioEntity(
     val createdAt: Long,
     /** 取引可能時間の制限（実際の立会時間＋データ遅延分の時間帯のみ売買可） */
     val enforceTradingHours: Boolean = true,
+    /** このゲームで到達した最高レベル */
+    val maxLevel: Int = 1,
 )
 
 /** 保有銘柄 */

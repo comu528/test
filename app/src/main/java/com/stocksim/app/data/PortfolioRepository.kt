@@ -101,6 +101,11 @@ class PortfolioRepository(
         db.portfolioDao().setEnforceTradingHours(enabled)
     }
 
+    /** 最高到達レベルの更新（下がることはない）。 */
+    suspend fun raiseMaxLevel(level: Int) {
+        db.portfolioDao().raiseMaxLevel(level)
+    }
+
     // ---- 売買 ----
 
     /** 約定代金に対する手数料（0.1%、円未満切り捨て） */

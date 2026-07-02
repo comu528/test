@@ -47,6 +47,28 @@ interface HoldingDao {
 }
 
 @Dao
+interface AssetSnapshotDao {
+    @Query("SELECT * FROM asset_snapshots ORDER BY timestamp ASC")
+    fun observeAll(): Flow<List<AssetSnapshotEntity>>
+
+    @Query("SELECT * FROM asset_snapshots ORDER BY timestamp DESC LIMIT 1")
+    suspend fun latest(): AssetSnapshotEntity?
+
+    @Insert
+    suspend fun insert(snapshot: AssetSnapshotEntity)
+
+    /** 古いスナップショットを間引いて肥大化を防ぐ */
+    @Query(
+        "DELETE FROM asset_snapshots WHERE id NOT IN " +
+            "(SELECT id FROM asset_snapshots ORDER BY timestamp DESC LIMIT 5000)"
+    )
+    suspend fun prune()
+
+    @Query("DELETE FROM asset_snapshots")
+    suspend fun clear()
+}
+
+@Dao
 interface TradeDao {
     @Query("SELECT * FROM trades ORDER BY timestamp DESC")
     fun observeAll(): Flow<List<TradeEntity>>

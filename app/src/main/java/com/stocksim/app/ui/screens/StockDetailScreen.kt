@@ -180,6 +180,7 @@ fun StockDetailScreen(
 
                 else -> {
                     val quote = state.quote!!
+                    val isForeign = quote.currency != "JPY"
                     Text(
                         text = state.symbol,
                         style = MaterialTheme.typography.bodySmall,
@@ -187,7 +188,8 @@ fun StockDetailScreen(
                     )
                     Row(verticalAlignment = Alignment.Bottom) {
                         Text(
-                            text = "${formatPrice(quote.price)}円",
+                            text = if (isForeign) "$" + formatPrice(quote.price)
+                            else "${formatPrice(quote.price)}円",
                             style = MaterialTheme.typography.headlineLarge,
                             fontWeight = FontWeight.Bold,
                         )
@@ -200,6 +202,7 @@ fun StockDetailScreen(
                     }
                     Text(
                         text = buildString {
+                            if (isForeign) append("約 ${formatYen(quote.priceJpy)}・")
                             append("15〜20分遅延データ")
                             quote.marketTime?.let { append("・${formatFullDateTime(it * 1000)} 時点") }
                         },
@@ -234,9 +237,16 @@ fun StockDetailScreen(
             } else {
                 val series = state.series
                 if (series != null) {
+                    // 取得単価（円建て）をチャートの通貨に換算して重ねる
+                    val fxRate = state.quote?.takeIf { it.price > 0.0 }
+                        ?.let { it.priceJpy / it.price } ?: 1.0
+                    val costBasisNative = state.holding?.averageCost?.div(fxRate)
                     PriceLineChart(
                         series = series,
                         baseline = if (state.selectedRange == ChartRange.DAY1) series.previousClose else null,
+                        baselineLabel = if (state.selectedRange == ChartRange.DAY1) "前日終値" else null,
+                        costBasis = costBasisNative,
+                        costBasisLabel = "取得単価",
                         modifier = Modifier
                             .fillMaxWidth()
                             .height(220.dp),
@@ -261,23 +271,26 @@ fun StockDetailScreen(
 
             // 当日の指標
             state.quote?.let { quote ->
+                val money: (Double) -> String = { value ->
+                    if (quote.currency != "JPY") "$" + formatPrice(value) else formatPrice(value) + "円"
+                }
                 Card(
                     modifier = Modifier.fillMaxWidth(),
                     colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
                 ) {
                     Column(modifier = Modifier.padding(16.dp)) {
-                        StatRow("前日終値", quote.previousClose?.let { "${formatPrice(it)}円" } ?: "—")
-                        StatRow("高値", quote.dayHigh?.let { "${formatPrice(it)}円" } ?: "—")
-                        StatRow("安値", quote.dayLow?.let { "${formatPrice(it)}円" } ?: "—")
+                        StatRow("前日終値", quote.previousClose?.let(money) ?: "—")
+                        StatRow("高値", quote.dayHigh?.let(money) ?: "—")
+                        StatRow("安値", quote.dayLow?.let(money) ?: "—")
                         StatRow("出来高", quote.volume?.let { formatVolume(it) } ?: "—", last = true)
                     }
                 }
                 Spacer(Modifier.height(12.dp))
             }
 
-            // 保有状況
+            // 保有状況（金額は円建て）
             state.holding?.let { holding ->
-                val quotePrice = state.quote?.price
+                val quotePrice = state.quote?.priceJpy
                 val pnl = quotePrice?.let { (it - holding.averageCost) * holding.quantity }
                 Card(
                     modifier = Modifier.fillMaxWidth(),
@@ -326,6 +339,8 @@ fun StockDetailScreen(
             isBuy = side == TradeSide.BUY,
             name = state.name,
             price = quote.price,
+            priceJpy = quote.priceJpy,
+            currency = quote.currency,
             cash = state.cash,
             heldQuantity = state.holding?.quantity ?: 0L,
             onConfirm = { quantity ->
@@ -365,6 +380,8 @@ private fun TradeDialog(
     isBuy: Boolean,
     name: String,
     price: Double,
+    priceJpy: Double,
+    currency: String,
     cash: Double,
     heldQuantity: Long,
     onConfirm: (quantity: Long) -> Unit,
@@ -372,8 +389,10 @@ private fun TradeDialog(
 ) {
     var quantityText by remember { mutableStateOf("100") }
     val quantity = quantityText.toLongOrNull() ?: 0L
+    val isForeign = currency != "JPY"
 
-    val amount = price * quantity
+    // 約定・手数料はすべて円建てで計算する
+    val amount = priceJpy * quantity
     val fee = floor(amount * PortfolioRepository.FEE_RATE)
     val total = if (isBuy) amount + fee else amount - fee
 
@@ -394,7 +413,13 @@ private fun TradeDialog(
                     horizontalArrangement = Arrangement.SpaceBetween,
                 ) {
                     Text("現在値", color = TextSecondary)
-                    Text("${formatPrice(price)}円")
+                    Text(
+                        text = if (isForeign) {
+                            "$" + formatPrice(price) + "（約 ${formatYen(priceJpy)}）"
+                        } else {
+                            "${formatPrice(price)}円"
+                        }
+                    )
                 }
                 Spacer(Modifier.height(12.dp))
                 Row(verticalAlignment = Alignment.CenterVertically) {

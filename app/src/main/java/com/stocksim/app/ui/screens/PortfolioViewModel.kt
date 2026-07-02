@@ -3,6 +3,7 @@ package com.stocksim.app.ui.screens
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.stocksim.app.data.PortfolioRepository
+import com.stocksim.app.data.local.AssetSnapshotEntity
 import com.stocksim.app.model.HoldingView
 import com.stocksim.app.model.Quote
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -51,7 +52,8 @@ class PortfolioViewModel(private val repo: PortfolioRepository) : ViewModel() {
                     name = h.name,
                     quantity = h.quantity,
                     averageCost = h.averageCost,
-                    currentPrice = quote?.price,
+                    currency = h.currency,
+                    currentPrice = quote?.priceJpy,
                     previousClose = quote?.previousClose,
                 )
             },
@@ -59,6 +61,10 @@ class PortfolioViewModel(private val repo: PortfolioRepository) : ViewModel() {
             lastUpdated = updated,
         )
     }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), PortfolioUiState())
+
+    /** 資産推移チャート用の履歴 */
+    val assetHistory: StateFlow<List<AssetSnapshotEntity>> = repo.assetSnapshots
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyList())
 
     /** 画面側のライフサイクル対応ループから呼ばれる自動更新（エラーは静かに握りつぶす） */
     fun autoRefresh() {
@@ -96,24 +102,25 @@ class PortfolioViewModel(private val repo: PortfolioRepository) : ViewModel() {
         } finally {
             refreshing.value = false
         }
-        checkGameOver()
+        recordAndCheckGameOver()
     }
 
     /**
-     * 総資産がゲームオーバー閾値を下回っていないか判定する。
+     * 総資産を計算してスナップショットに記録し、ゲームオーバー閾値との比較も行う。
      * 現在値を取得できていない銘柄は表示と同じく平均取得単価で評価する。
      */
-    private suspend fun checkGameOver() {
+    private suspend fun recordAndCheckGameOver() {
         val portfolio = repo.portfolio.first() ?: return
-        if (portfolio.gameOver) return
         val holdings = repo.holdings.first()
         val quoteMap = quotes.value
         val marketValue = holdings.sumOf { holding ->
-            val price = quoteMap[holding.symbol]?.price?.takeIf { it > 0.0 }
+            val price = quoteMap[holding.symbol]?.priceJpy?.takeIf { it > 0.0 }
                 ?: holding.averageCost
             price * holding.quantity
         }
-        if (portfolio.cash + marketValue < PortfolioRepository.GAME_OVER_THRESHOLD) {
+        val total = portfolio.cash + marketValue
+        repo.recordSnapshot(total)
+        if (!portfolio.gameOver && total < PortfolioRepository.GAME_OVER_THRESHOLD) {
             repo.markGameOver()
         }
     }

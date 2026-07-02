@@ -32,6 +32,7 @@ import androidx.compose.ui.unit.sp
 import com.stocksim.app.model.ChartSeries
 import com.stocksim.app.ui.theme.AppBackground
 import com.stocksim.app.ui.theme.AppOnBackground
+import com.stocksim.app.ui.theme.AppPrimary
 import com.stocksim.app.ui.theme.AppSurfaceVariant
 import com.stocksim.app.ui.theme.DownGreen
 import com.stocksim.app.ui.theme.TextSecondary
@@ -42,9 +43,10 @@ import kotlin.math.abs
 import kotlin.math.roundToInt
 
 /**
- * 株価の折れ線チャート。
- * - 基準値（1日表示なら前日終値、それ以外は期間先頭値）との比較で赤/緑を決める
- * - 前日終値は破線で表示
+ * 折れ線チャート（株価・資産推移共用）。
+ * - 基準値（前日終値や開始資金など）との比較で赤/緑を決める
+ * - [baseline] は破線＋ラベルで表示
+ * - [costBasis] は自分の取得単価ライン（保有銘柄のみ、レンジ内の時だけ描画）
  * - 横ドラッグでクロスヘア＋日時・価格のツールチップ
  */
 @Composable
@@ -52,6 +54,9 @@ fun PriceLineChart(
     series: ChartSeries,
     baseline: Double?,
     modifier: Modifier = Modifier,
+    baselineLabel: String? = null,
+    costBasis: Double? = null,
+    costBasisLabel: String? = null,
 ) {
     val closes = series.closes
     if (closes.size < 2) {
@@ -131,7 +136,7 @@ fun PriceLineChart(
             style = Stroke(width = 2.dp.toPx(), cap = StrokeCap.Round, join = StrokeJoin.Round),
         )
 
-        // 前日終値（破線）
+        // 基準線（前日終値・開始資金など、破線）
         baseline?.let { value ->
             val y = yAt(value)
             drawLine(
@@ -141,6 +146,41 @@ fun PriceLineChart(
                 strokeWidth = 1.dp.toPx(),
                 pathEffect = PathEffect.dashPathEffect(floatArrayOf(8f, 8f)),
             )
+            baselineLabel?.let { label ->
+                val text = textMeasurer.measure(AnnotatedString(label), labelStyle)
+                drawText(
+                    textLayoutResult = text,
+                    topLeft = Offset(
+                        w - text.size.width - 4.dp.toPx(),
+                        (y - text.size.height - 2.dp.toPx()).coerceIn(0f, h - text.size.height),
+                    ),
+                )
+            }
+        }
+
+        // 取得単価ライン（レンジ内にある時のみ描画）
+        costBasis?.takeIf { it in lo..hi }?.let { value ->
+            val y = yAt(value)
+            drawLine(
+                color = AppPrimary.copy(alpha = 0.8f),
+                start = Offset(0f, y),
+                end = Offset(w, y),
+                strokeWidth = 1.dp.toPx(),
+                pathEffect = PathEffect.dashPathEffect(floatArrayOf(4f, 6f)),
+            )
+            costBasisLabel?.let { label ->
+                val text = textMeasurer.measure(
+                    AnnotatedString(label),
+                    labelStyle.copy(color = AppPrimary),
+                )
+                drawText(
+                    textLayoutResult = text,
+                    topLeft = Offset(
+                        w - text.size.width - 4.dp.toPx(),
+                        (y + 2.dp.toPx()).coerceIn(0f, h - text.size.height),
+                    ),
+                )
+            }
         }
 
         // 高値・安値ラベル

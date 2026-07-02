@@ -5,7 +5,10 @@ data class Quote(
     val symbol: String,
     val name: String,
     val currency: String,
+    /** 取引通貨建ての現在値 */
     val price: Double,
+    /** 円換算した現在値（JPY銘柄は price と同値） */
+    val priceJpy: Double = price,
     val previousClose: Double?,
     val dayHigh: Double?,
     val dayLow: Double?,
@@ -31,12 +34,13 @@ data class StockSearchResult(
     val exchange: String,
 )
 
-/** 保有銘柄 + 現在値の表示用ビュー */
+/** 保有銘柄 + 現在値の表示用ビュー（金額はすべて円建て） */
 data class HoldingView(
     val symbol: String,
     val name: String,
     val quantity: Long,
     val averageCost: Double,
+    val currency: String,
     val currentPrice: Double?,
     val previousClose: Double?,
 ) {

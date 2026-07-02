@@ -19,8 +19,18 @@ data class HoldingEntity(
     @PrimaryKey val symbol: String,
     val name: String,
     val quantity: Long,
-    /** 平均取得単価 */
+    /** 平均取得単価（常に円建て。外貨銘柄は約定時レートで円換算して保存） */
     val averageCost: Double,
+    /** 銘柄の取引通貨（"JPY" / "USD"） */
+    val currency: String = "JPY",
+)
+
+/** 総資産の推移スナップショット（資産推移チャート用） */
+@Entity(tableName = "asset_snapshots")
+data class AssetSnapshotEntity(
+    @PrimaryKey(autoGenerate = true) val id: Long = 0,
+    val timestamp: Long,
+    val totalAssets: Double,
 )
 
 /** 取引履歴 */

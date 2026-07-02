@@ -76,18 +76,26 @@ class StockDetailViewModel(
         loadChart(range)
     }
 
-    fun buy(quantity: Long) = trade { price -> repo.buy(symbol, _uiState.value.name, quantity, price) }
+    fun buy(quantity: Long) = trade { quote ->
+        repo.buy(symbol, _uiState.value.name, quote.currency, quantity, quote.priceJpy)
+    }
 
-    fun sell(quantity: Long) = trade { price -> repo.sell(symbol, _uiState.value.name, quantity, price) }
+    fun sell(quantity: Long) = trade { quote ->
+        repo.sell(symbol, _uiState.value.name, quantity, quote.priceJpy)
+    }
 
     fun consumeMessage() {
         _message.value = null
     }
 
-    private fun trade(execute: suspend (price: Double) -> TradeOutcome) {
-        val price = _uiState.value.quote?.price ?: 0.0
+    private fun trade(execute: suspend (quote: Quote) -> TradeOutcome) {
+        val quote = _uiState.value.quote
+        if (quote == null) {
+            _message.value = "株価を取得できていないため注文できません"
+            return
+        }
         viewModelScope.launch {
-            when (val outcome = execute(price)) {
+            when (val outcome = execute(quote)) {
                 is TradeOutcome.Success -> _message.value = outcome.message
                 is TradeOutcome.Failure -> _message.value = outcome.message
             }

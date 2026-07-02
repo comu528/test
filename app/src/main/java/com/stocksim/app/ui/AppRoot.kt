@@ -67,7 +67,7 @@ private fun MainScaffold(onReset: () -> Unit) {
     val navController = rememberNavController()
     val tabs = listOf(
         TabItem("portfolio", "資産", Icons.Filled.PieChart),
-        TabItem("search", "検索", Icons.Filled.Search),
+        TabItem("search", "銘柄", Icons.Filled.Search),
         TabItem("history", "履歴", Icons.Filled.ReceiptLong),
     )
     val backStackEntry by navController.currentBackStackEntryAsState()

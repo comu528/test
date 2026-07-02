@@ -46,7 +46,10 @@ import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.compose.LocalLifecycleOwner
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.repeatOnLifecycle
+import com.stocksim.app.data.local.AssetSnapshotEntity
+import com.stocksim.app.model.ChartSeries
 import com.stocksim.app.model.HoldingView
+import com.stocksim.app.ui.components.PriceLineChart
 import com.stocksim.app.ui.theme.TextSecondary
 import com.stocksim.app.ui.theme.pnlColor
 import com.stocksim.app.util.formatDateTime
@@ -65,6 +68,7 @@ fun PortfolioScreen(
     onReset: () -> Unit,
 ) {
     val state by viewModel.uiState.collectAsStateWithLifecycle()
+    val assetHistory by viewModel.assetHistory.collectAsStateWithLifecycle()
     val error by viewModel.error.collectAsStateWithLifecycle()
     val snackbarHostState = remember { SnackbarHostState() }
     var showResetDialog by remember { mutableStateOf(false) }
@@ -116,6 +120,10 @@ fun PortfolioScreen(
             verticalArrangement = Arrangement.spacedBy(12.dp),
         ) {
             item { SummaryCard(state) }
+
+            if (assetHistory.size >= 2) {
+                item { AssetHistoryCard(history = assetHistory, initialCapital = state.initialCapital) }
+            }
 
             item {
                 Row(
@@ -230,6 +238,32 @@ private fun SummaryCard(state: PortfolioUiState) {
                     Text(formatYen(state.marketValue), style = MaterialTheme.typography.titleMedium)
                 }
             }
+        }
+    }
+}
+
+/** 総資産の推移チャート。開始資金を基準線として表示する。 */
+@Composable
+private fun AssetHistoryCard(history: List<AssetSnapshotEntity>, initialCapital: Double) {
+    Card(
+        modifier = Modifier.fillMaxWidth(),
+        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
+    ) {
+        Column(modifier = Modifier.padding(16.dp)) {
+            Text("資産推移", style = MaterialTheme.typography.titleSmall)
+            Spacer(Modifier.height(12.dp))
+            PriceLineChart(
+                series = ChartSeries(
+                    timestamps = history.map { it.timestamp / 1000 },
+                    closes = history.map { it.totalAssets },
+                    previousClose = initialCapital,
+                ),
+                baseline = initialCapital,
+                baselineLabel = "開始資金",
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(160.dp),
+            )
         }
     }
 }

@@ -268,15 +268,17 @@ class PortfolioRepository(
             val symbol = quote.symbol ?: return@mapNotNull null
             val isFx = quote.quoteType == "CURRENCY" &&
                 (symbol.endsWith("JPY=X") || symbol.endsWith("USD=X"))
+            val isIndex = quote.quoteType == "INDEX" && symbol.startsWith("^")
             val isEquity = quote.quoteType == "EQUITY" || quote.quoteType == "ETF"
             val isTokyo = isEquity && symbol.endsWith(".T")
             val isUs = isEquity && !symbol.contains(".")
-            if (!isFx && !isTokyo && !isUs) return@mapNotNull null
+            if (!isFx && !isIndex && !isTokyo && !isUs) return@mapNotNull null
             StockSearchResult(
                 symbol = symbol,
                 name = quote.longname ?: quote.shortname ?: symbol,
                 exchange = when {
                     isFx -> "FX"
+                    isIndex -> "指数"
                     isTokyo -> quote.exchDisp ?: "東証"
                     else -> quote.exchDisp ?: "米国"
                 },

@@ -56,6 +56,16 @@ object MarketCatalog {
         CatalogStock("9766.T", "コナミグループ"),
     )
 
+    // 通貨がJPY/USDの指数のみ（他通貨は円換算未対応のため）
+    val indices = listOf(
+        CatalogStock("^N225", "日経平均株価"),
+        CatalogStock("^DJI", "NYダウ"),
+        CatalogStock("^GSPC", "S&P 500"),
+        CatalogStock("^IXIC", "ナスダック総合"),
+        CatalogStock("^SOX", "SOX指数（半導体）"),
+        CatalogStock("^VIX", "VIX（恐怖指数）"),
+    )
+
     val fx = listOf(
         CatalogStock("USDJPY=X", "米ドル/円"),
         CatalogStock("EURJPY=X", "ユーロ/円"),

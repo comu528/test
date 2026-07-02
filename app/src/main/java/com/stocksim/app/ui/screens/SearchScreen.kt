@@ -174,6 +174,8 @@ private fun MarketListSection(
                     Text(
                         text = when {
                             quote == null -> "—"
+                            // 指数はポイント表記（通貨記号なし）
+                            row.symbol.startsWith("^") -> formatPrice(quote.price)
                             quote.currency == "USD" -> "$" + formatPrice(quote.price)
                             else -> formatPrice(quote.price) + "円"
                         },

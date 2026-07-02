@@ -32,6 +32,7 @@ object TradingHours {
     fun marketTypeOf(symbol: String): MarketType = when {
         symbol.endsWith("=X") -> MarketType.FX
         symbol.endsWith(".T") -> MarketType.TSE
+        symbol == "^N225" -> MarketType.TSE // 日経平均は東証の立会時間に従う
         else -> MarketType.US
     }
 

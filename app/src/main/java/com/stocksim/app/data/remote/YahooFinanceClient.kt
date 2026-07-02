@@ -33,6 +33,8 @@ class YahooFinanceClient {
                 .addQueryParameter("range", range)
                 .addQueryParameter("interval", interval)
                 .addQueryParameter("includePrePost", "false")
+                .addQueryParameter("lang", "ja-JP")
+                .addQueryParameter("region", "JP")
                 .build()
             val body = get(url.toString())
             val response = json.decodeFromString(ChartResponse.serializer(), body)
@@ -50,6 +52,8 @@ class YahooFinanceClient {
             .addQueryParameter("quotesCount", "20")
             .addQueryParameter("newsCount", "0")
             .addQueryParameter("listsCount", "0")
+            .addQueryParameter("lang", "ja-JP")
+            .addQueryParameter("region", "JP")
             .build()
         val body = get(url.toString())
         json.decodeFromString(SearchResponse.serializer(), body).quotes

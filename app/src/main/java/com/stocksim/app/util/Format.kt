@@ -25,8 +25,12 @@ fun formatSignedYen(value: Double): String {
 fun formatPrice(value: Double): String =
     if (abs(value) < 10.0) smallPriceFormat.format(value) else priceFormat.format(value)
 
-/** 数量の単位。FX（=X）は「通貨」、それ以外は「株」。 */
-fun unitLabelFor(symbol: String): String = if (symbol.endsWith("=X")) "通貨" else "株"
+/** 数量の単位。FX（=X）は「通貨」、指数（^）は「口」、それ以外は「株」。 */
+fun unitLabelFor(symbol: String): String = when {
+    symbol.endsWith("=X") -> "通貨"
+    symbol.startsWith("^") -> "口"
+    else -> "株"
+}
 
 /** 符号付きパーセント。 */
 fun formatSignedPercent(value: Double): String {

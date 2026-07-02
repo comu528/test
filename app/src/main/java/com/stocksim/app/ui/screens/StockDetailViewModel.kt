@@ -135,10 +135,12 @@ class StockDetailViewModel(
                     _message.value = "取引時間が終了したため注文は失敗しました"
                     return@launch
                 }
+                // 保有銘柄・履歴には画面表示と同じ（日本語優先の）名前で記録する
+                val displayName = _uiState.value.name.ifBlank { quote.name }
                 val outcome = if (isBuy) {
-                    repo.buy(symbol, quote.name, quote.currency, quantity, quote.priceJpy)
+                    repo.buy(symbol, displayName, quote.currency, quantity, quote.priceJpy)
                 } else {
-                    repo.sell(symbol, quote.name, quantity, quote.priceJpy)
+                    repo.sell(symbol, displayName, quantity, quote.priceJpy)
                 }
                 when (outcome) {
                     is TradeOutcome.Success -> _message.value = outcome.message
@@ -153,9 +155,12 @@ class StockDetailViewModel(
     /** クオートと取引可能時間の状態をまとめて反映する */
     private fun updateQuote(quote: Quote) {
         _uiState.update {
+            // 一覧・保有銘柄から渡された日本語名を優先し、
+            // 名前が無い（シンボルのまま）時だけAPIの名称で埋める
+            val displayName = if (it.name.isBlank() || it.name == it.symbol) quote.name else it.name
             it.copy(
                 quote = quote,
-                name = quote.name,
+                name = displayName,
                 marketOpen = TradingHours.isOpen(symbol, quote.delayMinutes),
                 marketHoursLabel = TradingHours.hoursLabel(symbol, quote.delayMinutes),
             )

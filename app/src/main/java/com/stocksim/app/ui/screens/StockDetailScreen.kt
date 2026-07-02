@@ -202,6 +202,7 @@ fun StockDetailScreen(
                 else -> {
                     val quote = state.quote!!
                     val isForeign = quote.currency != "JPY"
+                    val isIndex = state.symbol.startsWith("^")
                     Text(
                         text = state.symbol,
                         style = MaterialTheme.typography.bodySmall,
@@ -209,8 +210,11 @@ fun StockDetailScreen(
                     )
                     Row(verticalAlignment = Alignment.Bottom) {
                         Text(
-                            text = if (isForeign) "$" + formatPrice(quote.price)
-                            else "${formatPrice(quote.price)}円",
+                            text = when {
+                                isIndex -> formatPrice(quote.price) // 指数はポイント表記
+                                isForeign -> "$" + formatPrice(quote.price)
+                                else -> "${formatPrice(quote.price)}円"
+                            },
                             style = MaterialTheme.typography.headlineLarge,
                             fontWeight = FontWeight.Bold,
                         )
@@ -297,7 +301,11 @@ fun StockDetailScreen(
             // 当日の指標
             state.quote?.let { quote ->
                 val money: (Double) -> String = { value ->
-                    if (quote.currency != "JPY") "$" + formatPrice(value) else formatPrice(value) + "円"
+                    when {
+                        state.symbol.startsWith("^") -> formatPrice(value)
+                        quote.currency != "JPY" -> "$" + formatPrice(value)
+                        else -> formatPrice(value) + "円"
+                    }
                 }
                 Card(
                     modifier = Modifier.fillMaxWidth(),
@@ -450,9 +458,22 @@ private fun TradeDialog(
     onDismiss: () -> Unit,
 ) {
     val isFx = symbol.endsWith("=X")
+    val isIndex = symbol.startsWith("^")
     val unit = unitLabelFor(symbol)
-    val step = if (isFx) 1_000L else 100L
-    var quantityText by remember { mutableStateOf(if (isFx) "1000" else "100") }
+    val step = when {
+        isFx -> 1_000L
+        isIndex -> 1L
+        else -> 100L
+    }
+    var quantityText by remember {
+        mutableStateOf(
+            when {
+                isFx -> "1000"
+                isIndex -> "1"
+                else -> "100"
+            }
+        )
+    }
     val quantity = quantityText.toLongOrNull() ?: 0L
     val isForeign = currency != "JPY"
 

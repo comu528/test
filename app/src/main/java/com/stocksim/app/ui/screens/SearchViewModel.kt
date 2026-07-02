@@ -15,7 +15,7 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 
-enum class Market(val label: String) { JAPAN("日本株"), US("米国株"), FX("FX") }
+enum class Market(val label: String) { JAPAN("日本株"), US("米国株"), INDEX("指数"), FX("FX") }
 
 enum class MarketSort(val label: String) { GAINERS("値上がり"), LOSERS("値下がり"), CODE("コード順") }
 
@@ -135,7 +135,8 @@ class SearchViewModel(private val repo: PortfolioRepository) : ViewModel() {
         val rows = catalogFor(state.market).map { stock ->
             MarketRow(
                 symbol = stock.symbol,
-                name = quotes[stock.symbol]?.name?.takeIf { it.isNotBlank() } ?: stock.name,
+                // APIの名称は英語のことがあるため、カタログの日本語名を常に使う
+                name = stock.name,
                 quote = quotes[stock.symbol],
             )
         }
@@ -150,6 +151,7 @@ class SearchViewModel(private val repo: PortfolioRepository) : ViewModel() {
     private fun catalogFor(market: Market) = when (market) {
         Market.JAPAN -> MarketCatalog.japan
         Market.US -> MarketCatalog.us
+        Market.INDEX -> MarketCatalog.indices
         Market.FX -> MarketCatalog.fx
     }
 

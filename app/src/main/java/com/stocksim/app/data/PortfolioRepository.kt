@@ -259,31 +259,67 @@ class PortfolioRepository(
     }
 
     /**
-     * 銘柄検索。東証（.T）・米国市場（サフィックスなし）の株式/ETFと、
-     * 円建てまたはドル建てのFXペア（=X）を返す。
+     * 銘柄検索（ハイブリッド方式）。
+     * 1. ローカル辞書: 主要銘柄の日本語名・かな・略称で照合
+     *    （グローバル版 Yahoo の検索APIは日本語クエリにほぼ対応していないため）
+     * 2. 証券コード直接指定: 4桁コードは {code}.T として提案
+     * 3. Yahoo 検索API: 英語名・ティッカー向け。結果はマージして重複除去
+     */
+    suspend fun search(query: String): List<StockSearchResult> {
+        val trimmed = query.trim()
+        val local = SearchDictionary.search(trimmed)
+
+        val codeDirect = if (trimmed.matches(Regex("""\d{4}[A-Za-z]?"""))) {
+            val symbol = "${trimmed.uppercase()}.T"
+            if (local.none { it.symbol == symbol }) {
+                listOf(StockSearchResult(symbol = symbol, name = symbol, exchange = "東証"))
+            } else {
+                emptyList()
+            }
+        } else {
+            emptyList()
+        }
+
+        val remote = try {
+            mapRemoteResults(yahoo.search(trimmed))
+        } catch (e: kotlinx.coroutines.CancellationException) {
+            throw e
+        } catch (e: Exception) {
+            // ローカルにヒットがあれば Yahoo 側の失敗は無視する
+            if (local.isEmpty() && codeDirect.isEmpty()) throw e
+            emptyList()
+        }
+
+        return (local + codeDirect + remote).distinctBy { it.symbol }
+    }
+
+    /**
+     * Yahoo 検索結果のうち、東証（.T）・米国市場（サフィックスなし）の株式/ETF、
+     * 円建て/ドル建てFX（=X）、指数（^）だけを返す。
      * それ以外は通貨換算が未対応のため除外する。
      */
-    suspend fun search(query: String): List<StockSearchResult> =
-        yahoo.search(query).mapNotNull { quote ->
-            val symbol = quote.symbol ?: return@mapNotNull null
-            val isFx = quote.quoteType == "CURRENCY" &&
-                (symbol.endsWith("JPY=X") || symbol.endsWith("USD=X"))
-            val isIndex = quote.quoteType == "INDEX" && symbol.startsWith("^")
-            val isEquity = quote.quoteType == "EQUITY" || quote.quoteType == "ETF"
-            val isTokyo = isEquity && symbol.endsWith(".T")
-            val isUs = isEquity && !symbol.contains(".")
-            if (!isFx && !isIndex && !isTokyo && !isUs) return@mapNotNull null
-            StockSearchResult(
-                symbol = symbol,
-                name = quote.longname ?: quote.shortname ?: symbol,
-                exchange = when {
-                    isFx -> "FX"
-                    isIndex -> "指数"
-                    isTokyo -> quote.exchDisp ?: "東証"
-                    else -> quote.exchDisp ?: "米国"
-                },
-            )
-        }
+    private fun mapRemoteResults(
+        quotes: List<com.stocksim.app.data.remote.SearchQuote>,
+    ): List<StockSearchResult> = quotes.mapNotNull { quote ->
+        val symbol = quote.symbol ?: return@mapNotNull null
+        val isFx = quote.quoteType == "CURRENCY" &&
+            (symbol.endsWith("JPY=X") || symbol.endsWith("USD=X"))
+        val isIndex = quote.quoteType == "INDEX" && symbol.startsWith("^")
+        val isEquity = quote.quoteType == "EQUITY" || quote.quoteType == "ETF"
+        val isTokyo = isEquity && symbol.endsWith(".T")
+        val isUs = isEquity && !symbol.contains(".")
+        if (!isFx && !isIndex && !isTokyo && !isUs) return@mapNotNull null
+        StockSearchResult(
+            symbol = symbol,
+            name = quote.longname ?: quote.shortname ?: symbol,
+            exchange = when {
+                isFx -> "FX"
+                isIndex -> "指数"
+                isTokyo -> quote.exchDisp ?: "東証"
+                else -> quote.exchDisp ?: "米国"
+            },
+        )
+    }
 
     private fun ChartResult.toQuote(fallbackName: String?): Quote {
         // 現在値が欠けたレスポンスを0円として扱うと誤ったゲームオーバー判定や

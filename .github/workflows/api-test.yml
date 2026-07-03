@@ -1,0 +1,22 @@
+name: API Test
+
+on: workflow_dispatch
+
+jobs:
+  search-test:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Yahoo search API with Japanese queries
+        run: |
+          for q in "トヨタ" "任天堂" "日経平均" "7203" "Toyota"; do
+            echo "=== query: $q ==="
+            curl -s -G -H "User-Agent: Mozilla/5.0 (Windows NT 10.0; Win64; x64)" \
+              --data-urlencode "q=$q" \
+              --data-urlencode "lang=ja-JP" \
+              --data-urlencode "region=JP" \
+              --data-urlencode "quotesCount=10" \
+              --data-urlencode "newsCount=0" \
+              "https://query1.finance.yahoo.com/v1/finance/search" | head -c 1200
+            echo ""
+            echo ""
+          done
